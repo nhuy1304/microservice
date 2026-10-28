@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS "Shipment" (
+    shipid SERIAL PRIMARY KEY,
+    oid INT NOT NULL,
+    status VARCHAR(50) NOT NULL
+);

@@ -1,0 +1,268 @@
+services:
+  auth-db:
+    image: postgres:16
+    container_name: microservice-auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: ./auth-service
+    container_name: microservice-auth-service
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      DB_HOST: auth-db
+      DB_PORT: 5432
+      DB_NAME: auth_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: microservice_ecommerce_secret_key
+    ports:
+      - "3001:3001"
+    depends_on:
+      auth-db:
+        condition: service_healthy
+
+  customer-db:
+    image: postgres:16
+    container_name: microservice-customer-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: customer_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - customer_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d customer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  customer-service:
+    build:
+      context: .
+      dockerfile: ./customer-service/Dockerfile
+    container_name: microservice-customer-service
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      DB_HOST: customer-db
+      DB_PORT: 5432
+      DB_NAME: customer_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    ports:
+      - "3002:3002"
+      - "50051:50051"
+    depends_on:
+      customer-db:
+        condition: service_healthy
+
+  product-db:
+    image: postgres:16
+    container_name: microservice-product-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: product_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - product_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d product_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  product-service:
+    build:
+      context: .
+      dockerfile: ./product-service/Dockerfile
+    container_name: microservice-product-service
+    restart: unless-stopped
+    environment:
+      PORT: 3004
+      DB_HOST: product-db
+      DB_PORT: 5432
+      DB_NAME: product_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    ports:
+      - "3004:3004"
+      - "50052:50052"
+    depends_on:
+      product-db:
+        condition: service_healthy
+
+  order-db:
+    image: postgres:16
+    container_name: microservice-order-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: order_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-service:
+    build:
+      context: .
+      dockerfile: ./order-service/Dockerfile
+    container_name: microservice-order-service
+    restart: unless-stopped
+    environment:
+      PORT: 3003
+      DB_HOST: order-db
+      DB_PORT: 5432
+      DB_NAME: order_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      CUSTOMER_GRPC_ADDRESS: customer-service:50051
+      PRODUCT_GRPC_ADDRESS: product-service:50052
+      KAFKA_BROKER: kafka:29092
+    ports:
+      - "3003:3003"
+    depends_on:
+      order-db:
+        condition: service_healthy
+      customer-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      kafka:
+        condition: service_started
+
+  shipment-db:
+    image: postgres:16
+    container_name: microservice-shipment-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shipment_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - shipment_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shipment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  shipment-service:
+    build:
+      context: ./shipment-service
+    container_name: microservice-shipment-service
+    restart: unless-stopped
+    environment:
+      PORT: 3005
+      DB_HOST: shipment-db
+      DB_PORT: 5432
+      DB_NAME: shipment_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      KAFKA_BROKER: kafka:29092
+    ports:
+      - "3005:3005"
+    depends_on:
+      shipment-db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    container_name: microservice-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  kafka:
+    image: apache/kafka:3.9.1
+    container_name: microservice-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      KAFKA_LISTENERS: PLAINTEXT_HOST://:9092,PLAINTEXT_DOCKER://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:9092,PLAINTEXT_DOCKER://kafka:29092
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_DOCKER:PLAINTEXT
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_DOCKER
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: microservice-api-gateway
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      JWT_SECRET: microservice_ecommerce_secret_key
+
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CUSTOMER_SERVICE_URL: http://customer-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      PRODUCT_SERVICE_URL: http://product-service:3004
+      SHIPMENT_SERVICE_URL: http://shipment-service:3005
+
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      auth-service:
+        condition: service_started
+      customer-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      shipment-service:
+        condition: service_started
+      redis:
+        condition: service_started
+
+volumes:
+  auth_db_data:
+  customer_db_data:
+  product_db_data:
+  order_db_data:
+  shipment_db_data:

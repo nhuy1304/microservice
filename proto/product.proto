@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package product;
+
+service ProductService {
+  rpc GetProduct (GetProductRequest) returns (GetProductResponse);
+  rpc DecreaseStock (DecreaseStockRequest) returns (DecreaseStockResponse);
+}
+
+message GetProductRequest {
+  int32 pid = 1;
+}
+
+message GetProductResponse {
+  int32 pid = 1;
+  string pname = 2;
+  double price = 3;
+  int32 quantity = 4;
+}
+
+message DecreaseStockRequest {
+  int32 pid = 1;
+  int32 qty = 2;
+}
+
+message DecreaseStockResponse {
+  int32 pid = 1;
+  int32 quantity = 2;
+}

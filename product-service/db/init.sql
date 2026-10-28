@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS "Product" (
+    pid SERIAL PRIMARY KEY,
+    pname VARCHAR(100) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    quantity INT NOT NULL
+);
